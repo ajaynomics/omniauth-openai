@@ -185,6 +185,62 @@ class StrategyTest < Minitest::Test
     assert_fails_with "invalid_credentials", authorize
   end
 
+  def test_a_token_response_that_is_not_json_fails
+    authorize = start_sign_in
+    stub_request(:post, TOKEN_URL).to_return(status: 200, body: "<html>maintenance</html>", headers: { "Content-Type" => "text/html" })
+
+    assert_fails_with "invalid_credentials", authorize
+  end
+
+  def test_a_token_response_that_is_a_json_array_fails
+    authorize = start_sign_in
+    stub_request(:post, TOKEN_URL).to_return(status: 200, body: "[]", headers: { "Content-Type" => "application/json" })
+
+    assert_fails_with "invalid_credentials", authorize
+  end
+
+  def test_a_token_endpoint_error_fails
+    authorize = start_sign_in
+    stub_request(:post, TOKEN_URL).to_return(status: 400, body: JSON.dump(error: "invalid_grant"), headers: { "Content-Type" => "application/json" })
+
+    assert_fails_with "invalid_credentials", authorize
+  end
+
+  def test_an_id_token_that_is_not_a_jwt_fails
+    authorize = start_sign_in
+    stub_request(:post, TOKEN_URL).to_return(json(id_token: "not-a-jwt", token_type: "Bearer"))
+
+    assert_fails_with "invalid_credentials", authorize
+  end
+
+  def test_an_id_token_without_a_subject_fails
+    authorize = start_sign_in
+    stub_token_exchange(authorize, sub: nil)
+
+    assert_fails_with "invalid_credentials", authorize
+  end
+
+  def test_an_empty_subject_fails
+    authorize = start_sign_in
+    stub_token_exchange(authorize, sub: " ")
+
+    assert_fails_with "invalid_credentials", authorize
+  end
+
+  def test_a_key_set_that_is_not_json_fails_without_being_cached
+    authorize = start_sign_in
+    stub_token_exchange(authorize)
+    stub_request(:get, JWKS_URL)
+      .to_return({ status: 200, body: "<html>oops</html>", headers: { "Content-Type" => "text/html" } },
+                 json(JWT::JWK::Set.new(SIGNING_KEY).export))
+
+    assert_fails_with "invalid_credentials", authorize
+
+    retry_authorize = start_sign_in
+    stub_token_exchange(retry_authorize)
+    assert_equal "user-openai-sub", finish_sign_in(retry_authorize)["uid"]
+  end
+
   def test_an_unreachable_key_set_fails
     authorize = start_sign_in
     stub_token_exchange(authorize)

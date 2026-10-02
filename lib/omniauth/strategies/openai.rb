@@ -125,11 +125,20 @@ module OmniAuth
           leeway: options.leeway
         )
 
+        verify_subject(claims)
         verify_authorized_party(claims)
         verify_nonce(claims, expected_nonce)
         claims
       rescue ::JWT::DecodeError, ::OAuth2::Error, ::Faraday::Error, ::JSON::ParserError => e
         raise CallbackError.new(:invalid_id_token, e.message)
+      end
+
+      # ruby-jwt's required_claims checks only that sub is present. Accounts are
+      # keyed on it, so it must be a real identifier.
+      def verify_subject(claims)
+        return if claims["sub"].is_a?(String) && !claims["sub"].strip.empty?
+
+        raise CallbackError.new(:invalid_id_token, "The ID token has no subject")
       end
 
       # OpenID Connect Core 3.1.3.7: a token for several audiences must name
@@ -147,9 +156,16 @@ module OmniAuth
         raise CallbackError.new(:invalid_id_token, "The ID token nonce did not match")
       end
 
+      # A response that is not a key set raises before KeySet stores it, so
+      # one bad answer from the issuer cannot be cached as the keys.
       def signing_keys(kid_not_found: false)
         key_set.fetch(kid_not_found: kid_not_found) do
-          client.request(:get, options.jwks_uri).parsed
+          jwks = client.request(:get, options.jwks_uri).parsed
+          unless jwks.is_a?(Hash) && jwks["keys"].is_a?(Array)
+            raise CallbackError.new(:invalid_id_token, "The issuer's key set is not a JSON Web Key Set")
+          end
+
+          jwks
         end
       end
 
