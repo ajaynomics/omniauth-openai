@@ -105,6 +105,17 @@ bundle exec rake test
 JWT_VERSION="~> 2.10" bundle update jwt && bundle exec rake test
 ```
 
+## Releasing
+
+Bump `OmniAuth::OpenAI::VERSION`, add a `CHANGELOG.md` entry, then:
+
+```sh
+bundle exec rake test
+gem build omniauth-openai.gemspec
+gem push omniauth-openai-X.Y.Z.gem --otp CODE
+git tag -a vX.Y.Z -m "omniauth-openai X.Y.Z" && git push github main vX.Y.Z
+```
+
 ## License
 
 MIT
