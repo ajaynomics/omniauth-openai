@@ -32,8 +32,9 @@ module OmniAuth
       option :issuer, ISSUER
       option :jwks_uri, "#{ISSUER}/.well-known/jwks.json"
       # :basic (client_secret_basic), :post (client_secret_post), or :none for
-      # a public client. Left nil, a client with a secret uses :basic, the
-      # method OpenAI provisions by default, and one without uses :none.
+      # a public client, the three methods OpenAI's discovery document lists.
+      # Left nil, a client with a secret uses :basic, the OpenID Connect
+      # default, and one without uses :none.
       option :client_auth_method, nil
       option :leeway, 5
       option :client_options, {
